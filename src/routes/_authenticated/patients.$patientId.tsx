@@ -9,7 +9,7 @@ import { Section } from "@/components/clinic/Field";
 import { PatientForm, toPatientRow, validatePatient, type PatientInput } from "@/components/clinic/PatientForm";
 import { openDocument } from "@/components/clinic/hooks";
 import { bmi } from "@/lib/clinic";
-import { StatusBadge } from "./dashboard";
+import { StatusBadge } from "@/components/clinic/StatusBadge";
 
 export const Route = createFileRoute("/_authenticated/patients/$patientId")({
   head: () => ({ meta: [{ title: "Patient — Barakshar Clinic" }, { name: "description", content: "Patient profile and visit history." }] }),

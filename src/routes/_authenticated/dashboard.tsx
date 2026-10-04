@@ -5,6 +5,7 @@ import { Search, UserPlus, ChevronRight, ClipboardList } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/clinic/StatusBadge";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Patients — Barakshar Clinic" }, { name: "description", content: "Search patients and recent visits." }] }),
@@ -83,10 +84,4 @@ function Dashboard() {
       </div>
     </div>
   );
-}
-
-export function StatusBadge({ status }: { status: string }) {
-  return status === "completed"
-    ? <span className="rounded-full bg-success-soft px-2 py-0.5 text-[11px] font-semibold text-success">Completed</span>
-    : <span className="rounded-full bg-warning-soft px-2 py-0.5 text-[11px] font-semibold text-warning">Draft</span>;
 }
