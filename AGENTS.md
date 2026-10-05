@@ -8,3 +8,8 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Architecture rules
+- Data access uses the browser backend client with per-practitioner RLS (`practitioner_id = auth.uid()`); no server functions needed for CRUD.
+- Visit symptoms/examination/prescription are stored as JSON columns on `visits`; shapes and defaults live in `src/lib/clinic.ts` (use `mergeExam`/`mergeRx` when reading).
+- PDFs are built client-side with jsPDF (`src/lib/pdf.ts`), uploaded to the private `case-documents` bucket under `{userId}/{visitId}/`, and each upload gets a new `visit_documents` row — never overwrite.
