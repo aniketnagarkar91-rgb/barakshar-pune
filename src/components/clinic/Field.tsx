@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 
-export function Field({ label, children, className, error, hint }: { label: string; children: ReactNode; className?: string; error?: string; hint?: string }) {
+export function Field({ label, children, className, error, hint }: { label: string; children: ReactNode; className?: string | undefined; error?: string | undefined; hint?: string | undefined }) {
   return (
     <div className={cn("space-y-1.5", className)}>
       <Label className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{label}</Label>

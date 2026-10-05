@@ -20,16 +20,16 @@ function NewPatient() {
   async function save(startVisit: boolean) {
     const errs = validatePatient(v);
     setErrors(errs);
-    if (Object.keys(errs).length) return toast.error("Please fix the highlighted fields");
+    if (Object.keys(errs).length) return void toast.error("Please fix the highlighted fields");
     setBusy(true);
     const { data, error } = await supabase.from("patients").insert(toPatientRow(v)).select("id").single();
-    if (error || !data) { setBusy(false); return toast.error(error?.message ?? "Could not save"); }
+    if (error || !data) { setBusy(false); return void toast.error(error?.message ?? "Could not save"); }
     if (startVisit) {
       const { data: visit, error: e2 } = await supabase.from("visits").insert({ patient_id: data.id }).select("id").single();
       setBusy(false);
-      if (e2 || !visit) return toast.error(e2?.message ?? "Could not start visit");
+      if (e2 || !visit) return void toast.error(e2?.message ?? "Could not start visit");
       toast.success("Patient registered");
-      return navigate({ to: "/visits/$visitId", params: { visitId: visit.id } });
+      return void navigate({ to: "/visits/$visitId", params: { visitId: visit.id } });
     }
     setBusy(false);
     toast.success("Patient registered");

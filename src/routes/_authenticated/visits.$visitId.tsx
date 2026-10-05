@@ -74,8 +74,8 @@ function VisitPage() {
   }
 
   async function go(n: number) {
-    if (n === 4 && rx.items.length === 0) return toast.error("Add at least one tissue salt first");
-    if (n >= 2 && !symptoms.some((s) => s.complaint.trim())) return toast.error("Record at least one symptom");
+    if (n === 4 && rx.items.length === 0) return void toast.error("Add at least one tissue salt first");
+    if (n >= 2 && !symptoms.some((s) => s.complaint.trim())) return void toast.error("Record at least one symptom");
     if (dirty) await save({}, true);
     setStep(n);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -93,9 +93,9 @@ function VisitPage() {
     const safeName = patient.name.replace(/[^a-z0-9]+/gi, "_").slice(0, 40);
     const path = `${u.user!.id}/${visitId}/${kind}_${stamp}.pdf`;
     const up = await supabase.storage.from("case-documents").upload(path, blob, { contentType: "application/pdf", upsert: false });
-    if (up.error) return toast.error(up.error.message);
+    if (up.error) return void toast.error(up.error.message);
     const ins = await supabase.from("visit_documents").insert({ visit_id: visitId, kind, storage_path: path });
-    if (ins.error) return toast.error(ins.error.message);
+    if (ins.error) return void toast.error(ins.error.message);
     doc.save(`${safeName}_${kind === "case_paper" ? "CasePaper" : "Prescription"}_${visitDate}.pdf`);
     toast.success("PDF saved to visit history");
     qc.invalidateQueries({ queryKey: ["visit", visitId] });
@@ -204,7 +204,7 @@ function VisitPage() {
   );
 }
 
-function PdfStep({ title, desc, onMake, docs }: { title: string; desc: string; onMake: () => Promise<void>; docs: { id: string; storage_path: string; created_at: string }[] }) {
+function PdfStep({ title, desc, onMake, docs }: { title: string; desc: string; onMake: () => Promise<unknown>; docs: { id: string; storage_path: string; created_at: string }[] }) {
   const [busy, setBusy] = useState(false);
   return (
     <Section title={title} desc={desc}>

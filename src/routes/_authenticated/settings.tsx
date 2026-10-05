@@ -32,11 +32,11 @@ function Settings() {
   }, [data]);
   async function save() {
     const r = schema.safeParse(f);
-    if (!r.success) return toast.error(r.error.issues[0].message);
+    if (!r.success) return void toast.error(r.error.issues[0]?.message);
     const { data: u } = await supabase.auth.getUser();
     if (!u.user) return;
     const { error } = await supabase.from("profiles").upsert({ id: u.user.id, ...r.data });
-    if (error) return toast.error(error.message);
+    if (error) return void toast.error(error.message);
     toast.success("Clinic details saved");
     qc.invalidateQueries({ queryKey: ["clinic"] });
   }

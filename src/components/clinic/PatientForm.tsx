@@ -37,7 +37,7 @@ export function validatePatient(v: PatientInput) {
   return errs;
 }
 
-export function PatientForm({ value, onChange, errors = {} }: { value: PatientInput; onChange: (v: PatientInput) => void; errors?: Record<string, string> }) {
+export function PatientForm({ value, onChange, errors = {} }: { value: PatientInput; onChange: (v: PatientInput) => void; errors?: Partial<Record<keyof PatientInput, string>> }) {
   const set = (k: keyof PatientInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange({ ...value, [k]: e.target.value });
   const b = bmi(Number(value.height_cm), Number(value.weight_kg));
   return (

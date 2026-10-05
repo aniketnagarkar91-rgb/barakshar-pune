@@ -49,15 +49,15 @@ function PatientPage() {
 
   async function newVisit() {
     const { data, error } = await supabase.from("visits").insert({ patient_id: patientId }).select("id").single();
-    if (error || !data) return toast.error(error?.message ?? "Could not create visit");
+    if (error || !data) return void toast.error(error?.message ?? "Could not create visit");
     navigate({ to: "/visits/$visitId", params: { visitId: data.id } });
   }
   async function saveEdit() {
     if (!form) return;
     const errs = validatePatient(form); setErrors(errs);
-    if (Object.keys(errs).length) return toast.error("Please fix the highlighted fields");
+    if (Object.keys(errs).length) return void toast.error("Please fix the highlighted fields");
     const { error } = await supabase.from("patients").update(toPatientRow(form)).eq("id", patientId);
-    if (error) return toast.error(error.message);
+    if (error) return void toast.error(error.message);
     toast.success("Patient updated"); setEditing(false);
     qc.invalidateQueries({ queryKey: ["patient", patientId] });
   }
