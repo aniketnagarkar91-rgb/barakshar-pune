@@ -1,160 +1,149 @@
 import { jsPDF } from "jspdf";
-import autoTable from "jspdf-autotable";
+import html2canvas from "html2canvas";
 import { DISCLAIMER, bmi, type Clinic, type Examination, type Patient, type Prescription, type Symptom } from "./clinic";
+import { translate, type Lang } from "./i18n";
 
-const BLUE: [number, number, number] = [31, 95, 191];
-const DEEP: [number, number, number] = [24, 48, 96];
-const GREY: [number, number, number] = [100, 110, 125];
+// PDFs are rendered from HTML blocks via the browser so Devanagari (Marathi) text shapes correctly.
+const BLUE = "#1f5fbf";
+const DEEP = "#183060";
+const PAGE_W = 210, PAGE_H = 297, MARGIN = 12, FOOTER_H = 26;
+const PX_W = 760;
 
-function header(doc: jsPDF, clinic: Clinic, title: string, date: string) {
-  const w = doc.internal.pageSize.getWidth();
-  doc.setFillColor(...BLUE);
-  doc.rect(0, 0, w, 26, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(16);
-  doc.text(clinic.clinic_name || "Barakshar Clinic", 14, 11);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  const sub = [clinic.full_name, clinic.registration_no ? `Reg. ${clinic.registration_no}` : null].filter(Boolean).join("  |  ");
-  doc.text(sub || "Biochemic (12 Tissue Salts) Practice", 14, 17);
-  doc.text([clinic.phone ? `Tel: ${clinic.phone}` : "", clinic.address || ""].filter(Boolean).join("  |  "), 14, 22);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
-  doc.text(title.toUpperCase(), w - 14, 11, { align: "right" });
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
-  doc.text(`Date: ${date}`, w - 14, 17, { align: "right" });
-  doc.setTextColor(...DEEP);
+const esc = (s: unknown) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+const dash = (s: unknown) => (s === null || s === undefined || s === "" ? "-" : esc(s));
+
+type T = (s: string) => string;
+const FONT = `'IBM Plex Sans','Noto Sans Devanagari','Mukta',system-ui,sans-serif`;
+
+function headerHtml(t: T, clinic: Clinic, title: string, date: string) {
+  const sub = [clinic.full_name, clinic.registration_no ? `${t("Reg.")} ${clinic.registration_no}` : null].filter(Boolean).join("  |  ");
+  const contact = [clinic.phone ? `${t("Tel")}: ${clinic.phone}` : "", clinic.address || ""].filter(Boolean).join("  |  ");
+  return `<div style="background:${BLUE};color:#fff;padding:16px 20px;border-radius:6px;display:flex;justify-content:space-between;gap:16px">
+    <div><div style="font-size:22px;font-weight:700">${esc(clinic.clinic_name || "Barakshar Clinic")}</div>
+    <div style="font-size:12px;margin-top:4px">${esc(sub || t("Biochemic (12 Tissue Salts) Practice"))}</div>
+    <div style="font-size:12px;margin-top:2px">${esc(contact)}</div></div>
+    <div style="text-align:right"><div style="font-size:16px;font-weight:700;letter-spacing:1px">${esc(title.toUpperCase())}</div>
+    <div style="font-size:12px;margin-top:4px">${esc(t("Date"))}: ${esc(date)}</div></div></div>`;
 }
 
-function footer(doc: jsPDF) {
-  const pages = doc.getNumberOfPages();
-  const w = doc.internal.pageSize.getWidth();
-  const h = doc.internal.pageSize.getHeight();
-  for (let i = 1; i <= pages; i++) {
-    doc.setPage(i);
-    doc.setDrawColor(...BLUE);
-    doc.line(14, h - 24, w - 14, h - 24);
-    doc.setFontSize(7);
-    doc.setTextColor(...GREY);
-    doc.text(doc.splitTextToSize(`Disclaimer: ${DISCLAIMER}`, w - 28), 14, h - 19);
-    doc.text(`Confidential patient record  •  Page ${i} of ${pages}`, w - 14, h - 6, { align: "right" });
+const cell = "border:1px solid #c9d6ec;padding:6px 8px;vertical-align:top";
+function patientHtml(t: T, p: Patient) {
+  const k = (s: string) => `<td style="${cell};background:#eef3fc;font-weight:600;width:20%">${esc(t(s))}</td>`;
+  const v = (s: string) => `<td style="${cell}">${s}</td>`;
+  return `<table style="width:100%;border-collapse:collapse;font-size:13px">
+    <tr>${k("Name")}${v(esc(p.name))}${k("Age / Gender")}${v(`${dash(p.age)} / ${p.gender ? esc(t(p.gender)) : "-"}`)}</tr>
+    <tr>${k("Mobile")}${v(dash(p.mobile))}${k("Email")}${v(dash(p.email))}</tr>
+    <tr>${k("Height / Weight")}${v(`${dash(p.height_cm)} cm / ${dash(p.weight_kg)} kg`)}${k("BMI")}${v(dash(bmi(p.height_cm, p.weight_kg)))}</tr>
+    <tr>${k("Address")}<td colspan="3" style="${cell}">${dash(p.address)}</td></tr></table>`;
+}
+
+const sectionTitle = (s: string) => `<div style="color:${BLUE};font-weight:700;font-size:15px;margin:4px 0 6px">${esc(s)}</div>`;
+
+function kvHtml(t: T, title: string, rows: [string, string][]) {
+  const body = rows.filter(([, v]) => v && v.trim());
+  const trs = body.length
+    ? body.map(([k, v], i) => `<tr style="background:${i % 2 ? "#fff" : "#f5f8fd"}"><td style="padding:5px 8px;font-weight:600;width:32%">${esc(t(k))}</td><td style="padding:5px 8px;white-space:pre-wrap">${esc(v)}</td></tr>`).join("")
+    : `<tr><td style="padding:5px 8px;color:#667">${esc(t("Not recorded"))}</td></tr>`;
+  return `${sectionTitle(t(title))}<table style="width:100%;border-collapse:collapse;font-size:13px">${trs}</table>`;
+}
+
+function gridHtml(head: string[], rows: string[][]) {
+  return `<table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>${head.map((h) => `<th style="${cell};background:${BLUE};color:#fff;text-align:left">${esc(h)}</th>`).join("")}</tr></thead>
+    <tbody>${rows.map((r) => `<tr>${r.map((c) => `<td style="${cell}">${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+
+function signatureHtml(t: T, clinic: Clinic) {
+  return `<div style="display:flex;justify-content:flex-end;padding-top:40px"><div style="width:220px;text-align:center;font-size:13px">
+    <div style="border-top:1px solid #667;padding-top:4px">${esc(clinic.full_name || t("Practitioner"))}</div>
+    <div style="color:#667;font-size:12px">${esc(t("Signature"))}</div></div></div>`;
+}
+
+function footerHtml(t: T) {
+  return `<div style="border-top:1px solid ${BLUE};padding-top:6px;font-size:10px;color:#646e7d;line-height:1.45">
+    <b>${esc(t("Disclaimer"))}:</b> ${esc(t(DISCLAIMER))}<div style="text-align:right;margin-top:3px">${esc(t("Confidential patient record"))}</div></div>`;
+}
+
+async function snap(host: HTMLElement, html: string) {
+  const el = document.createElement("div");
+  el.style.cssText = `width:${PX_W}px;padding:4px 0;background:#fff;color:${DEEP};font-family:${FONT}`;
+  el.innerHTML = html;
+  host.appendChild(el);
+  const canvas = await html2canvas(el, { scale: 2, backgroundColor: "#ffffff", logging: false });
+  host.removeChild(el);
+  return { data: canvas.toDataURL("image/jpeg", 0.92), h: (canvas.height / canvas.width) * (PAGE_W - MARGIN * 2) };
+}
+
+async function compose(blocks: string[], footer: string) {
+  await document.fonts?.ready;
+  const host = document.createElement("div");
+  host.style.cssText = "position:fixed;left:-10000px;top:0";
+  document.body.appendChild(host);
+  try {
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const w = PAGE_W - MARGIN * 2;
+    const limit = PAGE_H - FOOTER_H;
+    let y = MARGIN;
+    for (const b of blocks) {
+      const img = await snap(host, b);
+      if (y + img.h > limit && y > MARGIN) { doc.addPage(); y = MARGIN; }
+      doc.addImage(img.data, "JPEG", MARGIN, y, w, img.h);
+      y += img.h + 2;
+    }
+    const f = await snap(host, footer);
+    const n = doc.getNumberOfPages();
+    for (let i = 1; i <= n; i++) {
+      doc.setPage(i);
+      doc.addImage(f.data, "JPEG", MARGIN, PAGE_H - FOOTER_H + 2, w, f.h);
+      doc.setFontSize(8); doc.setTextColor(100, 110, 125);
+      doc.text(`${i} / ${n}`, PAGE_W / 2, PAGE_H - 4, { align: "center" });
+    }
+    return doc;
+  } finally {
+    document.body.removeChild(host);
   }
 }
 
-function patientBlock(doc: jsPDF, p: Patient, y: number) {
-  autoTable(doc, {
-    startY: y,
-    theme: "grid",
-    styles: { fontSize: 9, cellPadding: 2, textColor: DEEP },
-    headStyles: { fillColor: BLUE },
-    columnStyles: { 0: { fontStyle: "bold", cellWidth: 28, fillColor: [238, 243, 252] }, 2: { fontStyle: "bold", cellWidth: 28, fillColor: [238, 243, 252] } },
-    body: [
-      ["Name", p.name, "Age / Gender", `${p.age ?? "-"} / ${p.gender ?? "-"}`],
-      ["Mobile", p.mobile || "-", "Email", p.email || "-"],
-      ["Height / Weight", `${p.height_cm ?? "-"} cm / ${p.weight_kg ?? "-"} kg`, "BMI", bmi(p.height_cm, p.weight_kg) ?? "-"],
-      ["Address", { content: p.address || "-", colSpan: 3 }],
-    ],
-    margin: { left: 14, right: 14, bottom: 30 },
-  });
-  return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-}
-
-function section(doc: jsPDF, label: string, y: number) {
-  if (y > doc.internal.pageSize.getHeight() - 50) { doc.addPage(); y = 20; }
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10.5);
-  doc.setTextColor(...BLUE);
-  doc.text(label, 14, y + 8);
-  doc.setTextColor(...DEEP);
-  doc.setFont("helvetica", "normal");
-  return y + 10;
-}
-
-function kv(doc: jsPDF, rows: [string, string][], y: number) {
-  const body = rows.filter(([, v]) => v && v.trim()).map(([k, v]) => [k, v]);
-  if (!body.length) body.push(["—", "Not recorded"]);
-  autoTable(doc, {
-    startY: y, theme: "striped", body,
-    styles: { fontSize: 9, cellPadding: 1.8, textColor: DEEP },
-    alternateRowStyles: { fillColor: [245, 248, 253] },
-    columnStyles: { 0: { fontStyle: "bold", cellWidth: 45 } },
-    margin: { left: 14, right: 14, bottom: 30 },
-  });
-  return (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-}
-
-export function buildCasePaper(clinic: Clinic, p: Patient, visitDate: string, symptoms: Symptom[], e: Examination) {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  header(doc, clinic, "Case Paper", visitDate);
-  let y = patientBlock(doc, p, 32);
-
-  y = section(doc, "Presenting Symptoms", y);
-  autoTable(doc, {
-    startY: y, theme: "grid",
-    head: [["#", "Complaint", "Location", "Duration", "Severity", "Better by", "Worse by"]],
-    body: symptoms.filter((s) => s.complaint).map((s, i) => [i + 1, s.complaint, s.location, s.duration, s.severity, s.better, s.worse]),
-    styles: { fontSize: 8.5, cellPadding: 1.8, textColor: DEEP }, headStyles: { fillColor: BLUE },
-    margin: { left: 14, right: 14, bottom: 30 },
-  });
-  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-
-  y = section(doc, "Vitals", y);
-  y = kv(doc, [["Blood pressure", e.vitals.bp], ["Pulse", e.vitals.pulse], ["Temperature", e.vitals.temperature], ["SpO2", e.vitals.spo2], ["Respiratory rate", e.vitals.resp]], y);
-  y = section(doc, "General Examination", y);
+export async function buildCasePaper(lang: Lang, clinic: Clinic, p: Patient, visitDate: string, symptoms: Symptom[], e: Examination) {
+  const t: T = (s) => translate(lang, s);
   const g = e.general;
-  y = kv(doc, [["Appetite", g.appetite], ["Thirst", g.thirst], ["Sleep", g.sleep], ["Bowel", g.bowel], ["Urine", g.urine], ["Perspiration", g.perspiration], ["Thermal reaction", g.thermal], ["Tongue", g.tongue], ["Skin", g.skin], ["Mental state", g.mental], ["Cravings / aversions", g.cravings], ["Menstrual history", g.menstrual]], y);
-  y = section(doc, "History", y);
-  y = kv(doc, [
-    ["Allergies", e.allergies],
-    ["Chronic diseases", [...e.chronic, e.chronic_other].filter(Boolean).join(", ")],
-    ["Past medical history", e.medical_history],
-    ["Surgical history", e.surgical_history],
-    ["Current medications", e.current_medications],
-    ["Family history", [...e.family.map((f) => `${f.condition}${f.relation ? ` (${f.relation})` : ""}`), e.family_notes].filter(Boolean).join("; ")],
-    ["Lifestyle", [e.lifestyle.diet && `Diet: ${e.lifestyle.diet}`, `Smoking: ${e.lifestyle.smoking}`, `Alcohol: ${e.lifestyle.alcohol}`, e.lifestyle.exercise && `Exercise: ${e.lifestyle.exercise}`].filter(Boolean).join(", ")],
-    ["Practitioner notes", e.notes],
-  ], y);
-  signature(doc, clinic, y);
-  footer(doc);
-  return doc;
+  const yn = (s: string) => t(s);
+  const blocks = [
+    headerHtml(t, clinic, t("Case paper"), visitDate),
+    patientHtml(t, p),
+    sectionTitle(t("Presenting Symptoms")) + gridHtml(
+      ["#", t("Complaint"), t("Location"), t("Duration"), t("Severity"), t("Better by"), t("Worse by")],
+      symptoms.filter((s) => s.complaint).map((s, i) => [String(i + 1), s.complaint, s.location, s.duration, t(s.severity), s.better, s.worse]),
+    ),
+    kvHtml(t, "Vitals", [["Blood pressure", e.vitals.bp], ["Pulse", e.vitals.pulse], ["Temperature", e.vitals.temperature], ["SpO₂ (%)", e.vitals.spo2], ["Respiratory rate", e.vitals.resp]]),
+    kvHtml(t, "General examination", [["Appetite", g.appetite], ["Thirst", g.thirst], ["Sleep", g.sleep], ["Bowel", g.bowel], ["Urine", g.urine], ["Perspiration", g.perspiration], ["Thermal reaction", g.thermal ? t(g.thermal) : ""], ["Tongue", g.tongue], ["Skin", g.skin], ["Mental state", g.mental], ["Cravings / aversions", g.cravings], ["Menstrual history", g.menstrual]]),
+    kvHtml(t, "History", [
+      ["Allergies", e.allergies],
+      ["Chronic diseases", [...e.chronic.map(t), e.chronic_other].filter(Boolean).join(", ")],
+      ["Past medical history", e.medical_history],
+      ["Surgical history", e.surgical_history],
+      ["Current medications", e.current_medications],
+      ["Family history", [...e.family.map((f) => `${t(f.condition)}${f.relation ? ` (${f.relation})` : ""}`), e.family_notes].filter(Boolean).join("; ")],
+      ["Lifestyle", [e.lifestyle.diet && `${t("Diet")}: ${t(e.lifestyle.diet)}`, `${t("Smoking")}: ${yn(e.lifestyle.smoking)}`, `${t("Alcohol")}: ${yn(e.lifestyle.alcohol)}`, e.lifestyle.exercise && `${t("Exercise")}: ${e.lifestyle.exercise}`].filter(Boolean).join(", ")],
+      ["Practitioner notes", e.notes],
+    ]),
+    signatureHtml(t, clinic),
+  ];
+  return compose(blocks, footerHtml(t));
 }
 
-function signature(doc: jsPDF, clinic: Clinic, y: number) {
-  const w = doc.internal.pageSize.getWidth();
-  if (y > doc.internal.pageSize.getHeight() - 55) { doc.addPage(); y = 20; }
-  doc.setFontSize(9);
-  doc.setDrawColor(...GREY);
-  doc.line(w - 74, y + 22, w - 14, y + 22);
-  doc.text(clinic.full_name || "Practitioner", w - 44, y + 27, { align: "center" });
-  doc.setTextColor(...GREY);
-  doc.text("Signature", w - 44, y + 31, { align: "center" });
-  doc.setTextColor(...DEEP);
-}
-
-export function buildPrescription(clinic: Clinic, p: Patient, visitDate: string, symptoms: Symptom[], rx: Prescription) {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  header(doc, clinic, "Prescription", visitDate);
-  let y = patientBlock(doc, p, 32);
+export async function buildPrescription(lang: Lang, clinic: Clinic, p: Patient, visitDate: string, symptoms: Symptom[], rx: Prescription) {
+  const t: T = (s) => translate(lang, s);
   const complaints = symptoms.map((s) => s.complaint).filter(Boolean).join(", ");
-  if (complaints) { y = section(doc, "Chief Complaints", y); doc.setFontSize(9); const t = doc.splitTextToSize(complaints, 180); doc.text(t, 14, y + 4); y += t.length * 4.5 + 2; }
-
-  doc.setFont("times", "bold"); doc.setFontSize(22); doc.setTextColor(...BLUE);
-  doc.text("Rx", 14, y + 12);
-  doc.setTextColor(...DEEP);
-  autoTable(doc, {
-    startY: y + 16, theme: "grid",
-    head: [["#", "Tissue salt", "Potency", "Dose", "Frequency", "Timing", "Duration", "Instructions"]],
-    body: rx.items.map((r, i) => [i + 1, r.salt, r.potency, r.dosage, r.frequency, r.timing, r.duration, r.instructions]),
-    styles: { fontSize: 8.5, cellPadding: 2, textColor: DEEP }, headStyles: { fillColor: BLUE },
-    columnStyles: { 1: { fontStyle: "bold" } },
-    margin: { left: 14, right: 14, bottom: 30 },
-  });
-  y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY;
-  y = section(doc, "Advice", y);
-  y = kv(doc, [["General instructions", rx.general], ["Diet & lifestyle", rx.diet], ["Follow-up", rx.follow_up]], y);
-  signature(doc, clinic, y);
-  footer(doc);
-  return doc;
+  const blocks = [
+    headerHtml(t, clinic, t("Prescription"), visitDate),
+    patientHtml(t, p),
+    ...(complaints ? [sectionTitle(t("Chief Complaints")) + `<div style="font-size:13px">${esc(complaints)}</div>`] : []),
+    `<div style="font-family:Georgia,serif;font-size:30px;font-weight:700;color:${BLUE}">Rx</div>` + gridHtml(
+      ["#", t("Tissue salt"), t("Potency"), t("Dose"), t("Frequency"), t("Timing"), t("Duration"), t("Instructions")],
+      rx.items.map((r, i) => [String(i + 1), r.salt, r.potency, t(r.dosage), t(r.frequency), t(r.timing), t(r.duration), r.instructions]),
+    ),
+    kvHtml(t, "Advice", [["General instructions", rx.general], ["Diet & lifestyle", rx.diet], ["Follow-up", rx.follow_up]]),
+    signatureHtml(t, clinic),
+  ];
+  return compose(blocks, footerHtml(t));
 }
