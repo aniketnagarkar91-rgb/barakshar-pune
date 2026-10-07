@@ -17,6 +17,7 @@ import {
   type Examination, type Patient, type Prescription, type Symptom,
 } from "@/lib/clinic";
 import { cn } from "@/lib/utils";
+import { useI18n } from "@/lib/i18n";
 
 export const Route = createFileRoute("/_authenticated/visits/$visitId")({
   head: () => ({ meta: [{ title: "Case paper — Barakshar Clinic" }, { name: "description", content: "Examination and prescription workflow." }] }),
@@ -29,6 +30,7 @@ function VisitPage() {
   const { visitId } = Route.useParams();
   const qc = useQueryClient();
   const { data: clinic } = useClinic();
+  const { t, lang } = useI18n();
   const [step, setStep] = useState(0);
   const [symptoms, setSymptoms] = useState<Symptom[]>([emptySymptom()]);
   const [exam, setExam] = useState<Examination>(mergeExam({}));
@@ -68,14 +70,14 @@ function VisitPage() {
     setSaving(false);
     if (error) { toast.error(error.message); return false; }
     setDirty(false);
-    if (!quiet) toast.success("Draft saved");
+    if (!quiet) toast.success(t("Draft saved"));
     qc.invalidateQueries({ queryKey: ["visit", visitId] });
     return true;
   }
 
   async function go(n: number) {
-    if (n === 4 && rx.items.length === 0) return void toast.error("Add at least one tissue salt first");
-    if (n >= 2 && !symptoms.some((s) => s.complaint.trim())) return void toast.error("Record at least one symptom");
+    if (n === 4 && rx.items.length === 0) return void toast.error(t("Add at least one tissue salt first"));
+    if (n >= 2 && !symptoms.some((s) => s.complaint.trim())) return void toast.error(t("Record at least one symptom"));
     if (dirty) await save({}, true);
     setStep(n);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -86,7 +88,7 @@ function VisitPage() {
     if (!(await save(kind === "prescription" ? { status: "completed" } : {}, true))) return;
     const { buildCasePaper, buildPrescription } = await import("@/lib/pdf");
     const cleanSymptoms = symptoms.filter((s) => s.complaint.trim());
-    const doc = kind === "case_paper" ? buildCasePaper(clinic, patient, visitDate, cleanSymptoms, exam) : buildPrescription(clinic, patient, visitDate, cleanSymptoms, rx);
+    const doc = kind === "case_paper" ? await buildCasePaper(lang, clinic, patient, visitDate, cleanSymptoms, exam) : await buildPrescription(lang, clinic, patient, visitDate, cleanSymptoms, rx);
     const blob = doc.output("blob");
     const { data: u } = await supabase.auth.getUser();
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -97,12 +99,12 @@ function VisitPage() {
     const ins = await supabase.from("visit_documents").insert({ visit_id: visitId, kind, storage_path: path });
     if (ins.error) return void toast.error(ins.error.message);
     doc.save(`${safeName}_${kind === "case_paper" ? "CasePaper" : "Prescription"}_${visitDate}.pdf`);
-    toast.success("PDF saved to visit history");
+    toast.success(t("PDF saved to visit history"));
     qc.invalidateQueries({ queryKey: ["visit", visitId] });
   }
 
-  if (visit.isLoading || !loaded) return <p className="text-muted-foreground">Loading…</p>;
-  if (!patient) return <p>Visit not found.</p>;
+  if (visit.isLoading || !loaded) return <p className="text-muted-foreground">{t("Loading…")}</p>;
+  if (!patient) return <p>{t("Visit not found.")}</p>;
 
   const docs = [...(visit.data?.visit_documents ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at));
   const update = <T,>(fn: (v: T) => void) => (v: T) => { fn(v); setDirty(true); };
@@ -116,11 +118,11 @@ function VisitPage() {
         <div>
           <Link to="/patients/$patientId" params={{ patientId: patient.id }} className="text-sm text-primary">← {patient.name}</Link>
           <div className="mt-1 flex items-center gap-3">
-            <h1 className="text-3xl font-extrabold text-primary-deep">Case paper</h1>
+            <h1 className="text-3xl font-extrabold text-primary-deep">{t("Case paper")}</h1>
             <StatusBadge status={visit.data!.status} />
           </div>
         </div>
-        <Button variant="outline" disabled={saving} onClick={() => save()}><Save />{saving ? "Saving…" : dirty ? "Save draft" : "Saved"}</Button>
+        <Button variant="outline" disabled={saving} onClick={() => save()}><Save />{t(saving ? "Saving…" : dirty ? "Save draft" : "Saved")}</Button>
       </div>
 
       <ol className="grid grid-cols-5 gap-1.5">
@@ -132,37 +134,37 @@ function VisitPage() {
                 <span className={cn("grid h-6 w-6 shrink-0 place-items-center rounded-full font-mono text-xs", i < step ? "bg-primary text-primary-foreground" : i === step ? "bg-primary-soft text-primary-deep ring-2 ring-primary" : "bg-muted text-muted-foreground")}>
                   {i < step ? <Check className="h-3.5 w-3.5" /> : i + 1}
                 </span>
-                <span className={cn("hidden text-xs font-medium md:block", i === step ? "text-primary-deep" : "text-muted-foreground")}>{s}</span>
+                <span className={cn("hidden text-xs font-medium md:block", i === step ? "text-primary-deep" : "text-muted-foreground")}>{t(s)}</span>
               </div>
             </button>
           </li>
         ))}
       </ol>
-      <p className="text-sm font-semibold text-primary-deep md:hidden">Step {step + 1}: {STEPS[step]}</p>
+      <p className="text-sm font-semibold text-primary-deep md:hidden">{t("Step")} {step + 1}: {t(STEPS[step]!)}</p>
 
       {step === 0 && (
         <>
           <Section title="Patient" desc="Edit the profile from the patient page." action={<Field label="Visit date"><Input type="date" value={visitDate} onChange={(e) => { setVisitDate(e.target.value); setDirty(true); }} /></Field>}>
             <dl className="grid gap-3 text-sm sm:grid-cols-4">
-              {[["Name", patient.name], ["Age / Gender", `${patient.age ?? "—"} / ${patient.gender ?? "—"}`], ["Mobile", patient.mobile], ["BMI", bmi(patient.height_cm, patient.weight_kg)]].map(([k, v]) => (
-                <div key={k as string}><dt className="text-xs font-semibold uppercase text-muted-foreground">{k}</dt><dd className="font-medium">{(v as string) || "—"}</dd></div>
+              {[["Name", patient.name], ["Age / Gender", `${patient.age ?? "—"} / ${patient.gender ? t(patient.gender) : "—"}`], ["Mobile", patient.mobile], ["BMI", bmi(patient.height_cm, patient.weight_kg)]].map(([k, v]) => (
+                <div key={k as string}><dt className="text-xs font-semibold uppercase text-muted-foreground">{t(k as string)}</dt><dd className="font-medium">{(v as string) || "—"}</dd></div>
               ))}
             </dl>
           </Section>
-          <Section title="Presenting symptoms" desc="Record each complaint separately." action={<Button size="sm" variant="soft" onClick={() => setS([...symptoms, emptySymptom()])}><Plus />Add symptom</Button>}>
+          <Section title="Presenting symptoms" desc="Record each complaint separately." action={<Button size="sm" variant="soft" onClick={() => setS([...symptoms, emptySymptom()])}><Plus />{t("Add symptom")}</Button>}>
             <div className="space-y-4">
               {symptoms.map((s, i) => {
                 const up = (k: keyof Symptom, v: string) => setS(symptoms.map((x, j) => (j === i ? { ...x, [k]: v } : x)));
                 return (
                   <div key={i} className="rounded-lg border bg-muted/40 p-4">
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="font-mono text-xs font-medium text-primary">SYMPTOM {String(i + 1).padStart(2, "0")}</span>
-                      {symptoms.length > 1 && <Button size="icon" variant="ghost" onClick={() => setS(symptoms.filter((_, j) => j !== i))} aria-label="Remove"><Trash2 /></Button>}
+                      <span className="font-mono text-xs font-medium text-primary">{t("SYMPTOM")} {String(i + 1).padStart(2, "0")}</span>
+                      {symptoms.length > 1 && <Button size="icon" variant="ghost" onClick={() => setS(symptoms.filter((_, j) => j !== i))} aria-label={t("Remove")}><Trash2 /></Button>}
                     </div>
                     <div className="grid gap-3 md:grid-cols-6">
                       <Field label="Complaint *" className="md:col-span-3"><Input value={s.complaint} onChange={(e) => up("complaint", e.target.value)} maxLength={200} /></Field>
                       <Field label="Location" className="md:col-span-3"><Input value={s.location} onChange={(e) => up("location", e.target.value)} /></Field>
-                      <Field label="Duration" className="md:col-span-2"><Input value={s.duration} onChange={(e) => up("duration", e.target.value)} placeholder="e.g. 2 weeks" /></Field>
+                      <Field label="Duration" className="md:col-span-2"><Input value={s.duration} onChange={(e) => up("duration", e.target.value)} placeholder={t("e.g. 2 weeks")} /></Field>
                       <Field label="Severity" className="md:col-span-1"><NativeSelect value={s.severity} onChange={(v) => up("severity", v)} options={["Mild", "Moderate", "Severe"]} /></Field>
                       <Field label="Better by" className="md:col-span-3 lg:col-span-1"><Input value={s.better} onChange={(e) => up("better", e.target.value)} /></Field>
                       <Field label="Worse by" className="md:col-span-3 lg:col-span-2"><Input value={s.worse} onChange={(e) => up("worse", e.target.value)} /></Field>
@@ -188,8 +190,8 @@ function VisitPage() {
           <div className="surface-card overflow-x-auto p-5">
             <h2 className="mb-3 font-bold text-primary-deep">Prescription summary</h2>
             <table className="w-full min-w-[560px] text-sm">
-              <thead className="text-left text-xs uppercase text-muted-foreground"><tr><th className="py-2">Salt</th><th>Potency</th><th>Dose</th><th>Frequency</th><th>Timing</th><th>Duration</th></tr></thead>
-              <tbody className="divide-y">{rx.items.map((r, i) => <tr key={i}><td className="py-2 font-medium">{r.salt}</td><td>{r.potency}</td><td>{r.dosage}</td><td>{r.frequency}</td><td>{r.timing}</td><td>{r.duration}</td></tr>)}</tbody>
+              <thead className="text-left text-xs uppercase text-muted-foreground"><tr>{["Salt", "Potency", "Dose", "Frequency", "Timing", "Duration"].map((h, i) => <th key={h} className={i === 0 ? "py-2" : ""}>{t(h)}</th>)}</tr></thead>
+              <tbody className="divide-y">{rx.items.map((r, i) => <tr key={i}><td className="py-2 font-medium">{r.salt}</td><td>{r.potency}</td><td>{t(r.dosage)}</td><td>{t(r.frequency)}</td><td>{t(r.timing)}</td><td>{t(r.duration)}</td></tr>)}</tbody>
             </table>
           </div>
           <PdfStep title="Shareable prescription" desc="Creates the patient-facing prescription and marks this visit as completed." onMake={() => makePdf("prescription")} docs={docs.filter((d) => d.kind === "prescription")} />
@@ -197,8 +199,8 @@ function VisitPage() {
       )}
 
       <div className="flex justify-between gap-2">
-        <Button variant="outline" disabled={step === 0} onClick={() => go(step - 1)}><ChevronLeft />Back</Button>
-        {step < 4 && <Button onClick={() => go(step + 1)}>Next: {STEPS[step + 1]}<ChevronRight /></Button>}
+        <Button variant="outline" disabled={step === 0} onClick={() => go(step - 1)}><ChevronLeft />{t("Back")}</Button>
+        {step < 4 && <Button onClick={() => go(step + 1)}>{t("Next")}: {t(STEPS[step + 1]!)}<ChevronRight /></Button>}
       </div>
     </div>
   );
@@ -206,19 +208,20 @@ function VisitPage() {
 
 function PdfStep({ title, desc, onMake, docs }: { title: string; desc: string; onMake: () => Promise<unknown>; docs: { id: string; storage_path: string; created_at: string }[] }) {
   const [busy, setBusy] = useState(false);
+  const { t, lang } = useI18n();
   return (
     <Section title={title} desc={desc}>
       <Button variant="hero" size="lg" disabled={busy} onClick={async () => { setBusy(true); await onMake(); setBusy(false); }}>
-        <FileDown />{busy ? "Generating…" : `Generate & download ${title.toLowerCase()}`}
+        <FileDown />{busy ? t("Generating…") : `${t("Generate & download")} ${lang === "mr" ? t(title) : title.toLowerCase()}`}
       </Button>
       {docs.length > 0 && (
         <div className="mt-5">
-          <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">Previous versions</p>
+          <p className="mb-2 text-xs font-semibold uppercase text-muted-foreground">{t("Previous versions")}</p>
           <ul className="space-y-1.5">
             {docs.map((d, i) => (
               <li key={d.id}>
-                <button className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-primary-soft" onClick={() => openDocument(d.storage_path).catch(() => toast.error("Could not open file"))}>
-                  <span>Version {docs.length - i} · {new Date(d.created_at).toLocaleString("en-IN")}</span>
+                <button className="flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm hover:bg-primary-soft" onClick={() => openDocument(d.storage_path).catch(() => toast.error(t("Could not open file")))}>
+                  <span>{t("Version")} {docs.length - i} · {new Date(d.created_at).toLocaleString(lang === "mr" ? "mr-IN" : "en-IN")}</span>
                   <FileDown className="h-4 w-4 text-primary" />
                 </button>
               </li>
@@ -239,6 +242,7 @@ function ExamForm({ e, set }: { e: Examination; set: (e: Examination) => void })
   const toggleFam = (c: string) => set({ ...e, family: fam(c) ? e.family.filter((f) => f.condition !== c) : [...e.family, { condition: c, relation: "" }] });
   const setRel = (c: string, r: string) => set({ ...e, family: e.family.map((f) => (f.condition === c ? { ...f, relation: r } : f)) });
   const l = (k: keyof Examination["lifestyle"], val: string) => set({ ...e, lifestyle: { ...e.lifestyle, [k]: val } });
+  const { t: tr } = useI18n();
 
   return (
     <div className="space-y-5">
@@ -264,12 +268,12 @@ function ExamForm({ e, set }: { e: Examination; set: (e: Examination) => void })
           <Field label="Skin"><Input {...g("skin")} /></Field>
           <Field label="Mental state"><Input {...g("mental")} /></Field>
           <Field label="Cravings / aversions"><Input {...g("cravings")} /></Field>
-          <Field label="Menstrual history"><Input {...g("menstrual")} placeholder="If applicable" /></Field>
+          <Field label="Menstrual history"><Input {...g("menstrual")} placeholder={tr("If applicable")} /></Field>
         </div>
       </Section>
       <Section title="Allergies & medical history">
         <div className="grid gap-3 md:grid-cols-2">
-          <Field label="Allergies (drug / food / other)"><Textarea rows={2} {...t("allergies")} placeholder="None known" /></Field>
+          <Field label="Allergies (drug / food / other)"><Textarea rows={2} {...t("allergies")} placeholder={tr("None known")} /></Field>
           <Field label="Current medications"><Textarea rows={2} {...t("current_medications")} /></Field>
           <Field label="Past medical history"><Textarea rows={2} {...t("medical_history")} /></Field>
           <Field label="Surgical history"><Textarea rows={2} {...t("surgical_history")} /></Field>
@@ -279,7 +283,7 @@ function ExamForm({ e, set }: { e: Examination; set: (e: Examination) => void })
         <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
           {CHRONIC_DISEASES.map((c) => (
             <label key={c} className={cn("flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm", e.chronic.includes(c) && "border-primary bg-primary-soft")}>
-              <Checkbox checked={e.chronic.includes(c)} onCheckedChange={() => toggleChronic(c)} />{c}
+              <Checkbox checked={e.chronic.includes(c)} onCheckedChange={() => toggleChronic(c)} />{tr(c)}
             </label>
           ))}
         </div>
@@ -289,8 +293,8 @@ function ExamForm({ e, set }: { e: Examination; set: (e: Examination) => void })
         <div className="grid gap-2 md:grid-cols-2">
           {FAMILY_CONDITIONS.map((c) => (
             <div key={c} className={cn("flex items-center gap-3 rounded-md border px-3 py-2", fam(c) && "border-primary bg-primary-soft")}>
-              <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm"><Checkbox checked={!!fam(c)} onCheckedChange={() => toggleFam(c)} />{c}</label>
-              {fam(c) && <Input className="h-8 w-40 bg-card" placeholder="Relation" value={fam(c)!.relation} onChange={(x) => setRel(c, x.target.value)} />}
+              <label className="flex flex-1 cursor-pointer items-center gap-2 text-sm"><Checkbox checked={!!fam(c)} onCheckedChange={() => toggleFam(c)} />{tr(c)}</label>
+              {fam(c) && <Input className="h-8 w-40 bg-card" placeholder={tr("Relation")} value={fam(c)!.relation} onChange={(x) => setRel(c, x.target.value)} />}
             </div>
           ))}
         </div>
@@ -311,12 +315,13 @@ function ExamForm({ e, set }: { e: Examination; set: (e: Examination) => void })
 
 function RxForm({ rx, set }: { rx: Prescription; set: (r: Prescription) => void }) {
   const selected = rx.items.map((i) => i.salt);
+  const { t } = useI18n();
   const toggle = (name: string) => set({ ...rx, items: selected.includes(name) ? rx.items.filter((i) => i.salt !== name) : [...rx.items, emptyRx(name)] });
   return (
     <div className="space-y-5">
       <div className="flex gap-3 rounded-lg border border-warning/40 bg-warning-soft p-4 text-sm">
         <ShieldAlert className="h-5 w-5 shrink-0 text-warning" />
-        <p>Selections are made solely by the practitioner based on traditional biochemic practice. The system does not suggest or auto-select salts. {DISCLAIMER.split(".")[2]}.</p>
+        <p>{t("Selections are made solely by the practitioner based on traditional biochemic practice. The system does not suggest or auto-select salts.")} {t(DISCLAIMER)}</p>
       </div>
       <Section title="Select tissue salts" desc="Tap to add or remove.">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
@@ -335,14 +340,14 @@ function RxForm({ rx, set }: { rx: Prescription; set: (r: Prescription) => void 
       {rx.items.map((it, i) => {
         const up = (k: keyof typeof it, val: string) => set({ ...rx, items: rx.items.map((x, j) => (j === i ? { ...x, [k]: val } : x)) });
         return (
-          <Section key={it.salt} title={it.salt} action={<Button size="icon" variant="ghost" aria-label="Remove" onClick={() => toggle(it.salt)}><Trash2 /></Button>}>
+          <Section key={it.salt} title={it.salt} action={<Button size="icon" variant="ghost" aria-label={t("Remove")} onClick={() => toggle(it.salt)}><Trash2 /></Button>}>
             <div className="grid gap-3 md:grid-cols-5">
               <Field label="Strength / potency"><NativeSelect value={it.potency} onChange={(v) => up("potency", v)} options={POTENCIES} /></Field>
-              <Field label="Dosage"><Input value={it.dosage} onChange={(e) => up("dosage", e.target.value)} /></Field>
+              <Field label="Dosage"><Input value={t(it.dosage)} onChange={(e) => up("dosage", e.target.value)} /></Field>
               <Field label="Frequency"><NativeSelect value={it.frequency} onChange={(v) => up("frequency", v)} options={FREQUENCIES} /></Field>
               <Field label="Timing"><NativeSelect value={it.timing} onChange={(v) => up("timing", v)} options={TIMINGS} /></Field>
-              <Field label="Duration"><Input value={it.duration} onChange={(e) => up("duration", e.target.value)} /></Field>
-              <Field label="Instructions" className="md:col-span-5"><Input value={it.instructions} onChange={(e) => up("instructions", e.target.value)} placeholder="e.g. Dissolve on tongue, avoid strong coffee for 15 min" /></Field>
+              <Field label="Duration"><Input value={t(it.duration)} onChange={(e) => up("duration", e.target.value)} /></Field>
+              <Field label="Instructions" className="md:col-span-5"><Input value={it.instructions} onChange={(e) => up("instructions", e.target.value)} placeholder={t("e.g. Dissolve on tongue, avoid strong coffee for 15 min")} /></Field>
             </div>
           </Section>
         );
@@ -351,7 +356,7 @@ function RxForm({ rx, set }: { rx: Prescription; set: (r: Prescription) => void 
         <div className="grid gap-3 md:grid-cols-2">
           <Field label="General instructions"><Textarea rows={2} value={rx.general} onChange={(e) => set({ ...rx, general: e.target.value })} /></Field>
           <Field label="Diet & lifestyle"><Textarea rows={2} value={rx.diet} onChange={(e) => set({ ...rx, diet: e.target.value })} /></Field>
-          <Field label="Follow-up"><Input value={rx.follow_up} onChange={(e) => set({ ...rx, follow_up: e.target.value })} placeholder="e.g. After 15 days" /></Field>
+          <Field label="Follow-up"><Input value={rx.follow_up} onChange={(e) => set({ ...rx, follow_up: e.target.value })} placeholder={t("e.g. After 15 days")} /></Field>
         </div>
       </Section>
     </div>

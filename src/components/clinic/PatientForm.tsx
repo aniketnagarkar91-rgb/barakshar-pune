@@ -5,6 +5,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Field, NativeSelect } from "./Field";
 import { bmi } from "@/lib/clinic";
 
+
 export const patientSchema = z.object({
   name: z.string().trim().min(2, "Name is required").max(100),
   age: z.coerce.number().int().min(0, "Invalid age").max(130, "Invalid age"),
