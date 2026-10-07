@@ -14,7 +14,166 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      patients: {
+        Row: {
+          address: string | null
+          age: number | null
+          created_at: string
+          email: string | null
+          gender: string | null
+          height_cm: number | null
+          id: string
+          mobile: string | null
+          name: string
+          practitioner_id: string
+          updated_at: string
+          weight_kg: number | null
+        }
+        Insert: {
+          address?: string | null
+          age?: number | null
+          created_at?: string
+          email?: string | null
+          gender?: string | null
+          height_cm?: number | null
+          id?: string
+          mobile?: string | null
+          name: string
+          practitioner_id?: string
+          updated_at?: string
+          weight_kg?: number | null
+        }
+        Update: {
+          address?: string | null
+          age?: number | null
+          created_at?: string
+          email?: string | null
+          gender?: string | null
+          height_cm?: number | null
+          id?: string
+          mobile?: string | null
+          name?: string
+          practitioner_id?: string
+          updated_at?: string
+          weight_kg?: number | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          clinic_name: string | null
+          created_at: string
+          full_name: string | null
+          id: string
+          phone: string | null
+          registration_no: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          clinic_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          registration_no?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          clinic_name?: string | null
+          created_at?: string
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          registration_no?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      visit_documents: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          practitioner_id: string
+          storage_path: string
+          visit_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          practitioner_id?: string
+          storage_path: string
+          visit_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          practitioner_id?: string
+          storage_path?: string
+          visit_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visit_documents_visit_id_fkey"
+            columns: ["visit_id"]
+            isOneToOne: false
+            referencedRelation: "visits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      visits: {
+        Row: {
+          created_at: string
+          examination: Json
+          id: string
+          patient_id: string
+          practitioner_id: string
+          prescription: Json
+          status: string
+          symptoms: Json
+          updated_at: string
+          visit_date: string
+        }
+        Insert: {
+          created_at?: string
+          examination?: Json
+          id?: string
+          patient_id: string
+          practitioner_id?: string
+          prescription?: Json
+          status?: string
+          symptoms?: Json
+          updated_at?: string
+          visit_date?: string
+        }
+        Update: {
+          created_at?: string
+          examination?: Json
+          id?: string
+          patient_id?: string
+          practitioner_id?: string
+          prescription?: Json
+          status?: string
+          symptoms?: Json
+          updated_at?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visits_patient_id_fkey"
+            columns: ["patient_id"]
+            isOneToOne: false
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
