@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Field, Section } from "@/components/clinic/Field";
+import { useI18n } from "@/lib/i18n";
 import { useClinic } from "@/components/clinic/hooks";
 
 export const Route = createFileRoute("/_authenticated/settings")({
@@ -25,6 +26,7 @@ const schema = z.object({
 
 function Settings() {
   const { data } = useClinic();
+  const { t } = useI18n();
   const qc = useQueryClient();
   const [f, setF] = useState({ clinic_name: "", full_name: "", phone: "", registration_no: "", address: "" });
   useEffect(() => {
@@ -37,13 +39,13 @@ function Settings() {
     if (!u.user) return;
     const { error } = await supabase.from("profiles").upsert({ id: u.user.id, ...r.data });
     if (error) return void toast.error(error.message);
-    toast.success("Clinic details saved");
+    toast.success(t("Clinic details saved"));
     qc.invalidateQueries({ queryKey: ["clinic"] });
   }
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
   return (
     <div className="space-y-5">
-      <h1 className="text-3xl font-extrabold text-primary-deep">Clinic branding</h1>
+      <h1 className="text-3xl font-extrabold text-primary-deep">{t("Clinic branding")}</h1>
       <Section title="Shown on every PDF" desc="Header of case papers and prescriptions.">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Clinic name"><Input value={f.clinic_name} onChange={set("clinic_name")} /></Field>
@@ -52,7 +54,7 @@ function Settings() {
           <Field label="Registration no."><Input value={f.registration_no} onChange={set("registration_no")} /></Field>
           <Field label="Address" className="md:col-span-2"><Textarea rows={2} value={f.address} onChange={set("address")} /></Field>
         </div>
-        <div className="mt-5 flex justify-end"><Button onClick={save}>Save</Button></div>
+        <div className="mt-5 flex justify-end"><Button onClick={save}>{t("Save")}</Button></div>
       </Section>
     </div>
   );

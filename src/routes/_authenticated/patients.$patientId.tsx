@@ -9,6 +9,7 @@ import { Section } from "@/components/clinic/Field";
 import { PatientForm, toPatientRow, validatePatient, type PatientInput } from "@/components/clinic/PatientForm";
 import { openDocument } from "@/components/clinic/hooks";
 import { bmi } from "@/lib/clinic";
+import { useI18n } from "@/lib/i18n";
 import { StatusBadge } from "@/components/clinic/StatusBadge";
 
 export const Route = createFileRoute("/_authenticated/patients/$patientId")({
@@ -24,6 +25,8 @@ function toInput(p: Record<string, unknown>): PatientInput {
 function PatientPage() {
   const { patientId } = Route.useParams();
   const navigate = useNavigate();
+  const { t, lang } = useI18n();
+  const loc = lang === "mr" ? "mr-IN" : "en-IN";
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState<PatientInput | null>(null);
@@ -49,54 +52,54 @@ function PatientPage() {
 
   async function newVisit() {
     const { data, error } = await supabase.from("visits").insert({ patient_id: patientId }).select("id").single();
-    if (error || !data) return void toast.error(error?.message ?? "Could not create visit");
+    if (error || !data) return void toast.error(error?.message ?? t("Could not create visit"));
     navigate({ to: "/visits/$visitId", params: { visitId: data.id } });
   }
   async function saveEdit() {
     if (!form) return;
     const errs = validatePatient(form); setErrors(errs);
-    if (Object.keys(errs).length) return void toast.error("Please fix the highlighted fields");
+    if (Object.keys(errs).length) return void toast.error(t("Please fix the highlighted fields"));
     const { error } = await supabase.from("patients").update(toPatientRow(form)).eq("id", patientId);
     if (error) return void toast.error(error.message);
-    toast.success("Patient updated"); setEditing(false);
+    toast.success(t("Patient updated")); setEditing(false);
     qc.invalidateQueries({ queryKey: ["patient", patientId] });
   }
   async function download(path: string) {
-    try { await openDocument(path); } catch { toast.error("Could not open file"); }
+    try { await openDocument(path); } catch { toast.error(t("Could not open file")); }
   }
 
   const p = patient.data;
-  if (patient.isLoading) return <p className="text-muted-foreground">Loading…</p>;
-  if (!p) return <p>Patient not found. <Link to="/dashboard" className="text-primary">Back</Link></p>;
+  if (patient.isLoading) return <p className="text-muted-foreground">{t("Loading…")}</p>;
+  if (!p) return <p>{t("Patient not found.")} <Link to="/dashboard" className="text-primary">{t("Back")}</Link></p>;
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <Link to="/dashboard" className="text-sm text-primary">← All patients</Link>
+          <Link to="/dashboard" className="text-sm text-primary">← {t("All patients")}</Link>
           <h1 className="mt-1 text-3xl font-extrabold text-primary-deep">{p.name}</h1>
-          <p className="text-sm text-muted-foreground">{[p.age && `${p.age} yrs`, p.gender, p.mobile, bmi(p.height_cm, p.weight_kg) && `BMI ${bmi(p.height_cm, p.weight_kg)}`].filter(Boolean).join(" · ")}</p>
+          <p className="text-sm text-muted-foreground">{[p.age && `${p.age} ${t("yrs")}`, p.gender && t(p.gender), p.mobile, bmi(p.height_cm, p.weight_kg) && `BMI ${bmi(p.height_cm, p.weight_kg)}`].filter(Boolean).join(" · ")}</p>
         </div>
-        <Button variant="hero" onClick={newVisit}><FilePlus2 />New case paper</Button>
+        <Button variant="hero" onClick={newVisit}><FilePlus2 />{t("New case paper")}</Button>
       </div>
 
-      <Section title="Profile" action={!editing && <Button size="sm" variant="soft" onClick={() => setEditing(true)}><Pencil />Edit</Button>}>
+      <Section title="Profile" action={!editing && <Button size="sm" variant="soft" onClick={() => setEditing(true)}><Pencil />{t("Edit")}</Button>}>
         {editing && form ? (
           <>
             <PatientForm value={form} onChange={setForm} errors={errors} />
-            <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => { setEditing(false); setForm(toInput(p)); }}>Cancel</Button><Button onClick={saveEdit}>Save</Button></div>
+            <div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => { setEditing(false); setForm(toInput(p)); }}>{t("Cancel")}</Button><Button onClick={saveEdit}>{t("Save")}</Button></div>
           </>
         ) : (
           <dl className="grid gap-3 text-sm sm:grid-cols-3">
             {[["Email", p.email], ["Height", p.height_cm && `${p.height_cm} cm`], ["Weight", p.weight_kg && `${p.weight_kg} kg`], ["Address", p.address]].map(([k, v]) => (
-              <div key={k as string}><dt className="text-xs font-semibold uppercase text-muted-foreground">{k}</dt><dd>{(v as string) || "—"}</dd></div>
+              <div key={k as string}><dt className="text-xs font-semibold uppercase text-muted-foreground">{t(k as string)}</dt><dd>{(v as string) || "—"}</dd></div>
             ))}
           </dl>
         )}
       </Section>
 
       <Section title="Visit history" desc="Every case paper and prescription PDF is kept — nothing is overwritten.">
-        {visits.data?.length === 0 && <p className="text-sm text-muted-foreground">No visits yet.</p>}
+        {visits.data?.length === 0 && <p className="text-sm text-muted-foreground">{t("No visits yet.")}</p>}
         <ol className="space-y-3">
           {visits.data?.map((v) => {
             const complaints = (v.symptoms as { complaint?: string }[]).map((s) => s.complaint).filter(Boolean).join(", ");
@@ -105,10 +108,10 @@ function PatientPage() {
               <li key={v.id} className="rounded-lg border p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <span className="font-mono text-sm font-medium text-primary-deep">{new Date(v.visit_date).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</span>
+                    <span className="font-mono text-sm font-medium text-primary-deep">{new Date(v.visit_date).toLocaleDateString(loc, { day: "2-digit", month: "short", year: "numeric" })}</span>
                     <StatusBadge status={v.status} />
                   </div>
-                  <Button asChild size="sm" variant="soft"><Link to="/visits/$visitId" params={{ visitId: v.id }}>Open</Link></Button>
+                  <Button asChild size="sm" variant="soft"><Link to="/visits/$visitId" params={{ visitId: v.id }}>{t("Open")}</Link></Button>
                 </div>
                 {complaints && <p className="mt-2 text-sm text-muted-foreground">{complaints}</p>}
                 {docs.length > 0 && (
@@ -116,7 +119,7 @@ function PatientPage() {
                     {docs.map((d) => (
                       <button key={d.id} onClick={() => download(d.storage_path)} className="inline-flex items-center gap-1.5 rounded-md border bg-card px-2.5 py-1.5 text-xs hover:bg-primary-soft">
                         <FileDown className="h-3.5 w-3.5 text-primary" />
-                        {d.kind === "case_paper" ? "Case paper" : "Prescription"} · {new Date(d.created_at).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                        {t(d.kind === "case_paper" ? "Case paper" : "Prescription")} · {new Date(d.created_at).toLocaleString(loc, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
                       </button>
                     ))}
                   </div>
