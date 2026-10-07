@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Field, NativeSelect } from "./Field";
 import { bmi } from "@/lib/clinic";
-import { useI18n } from "@/lib/i18n";
+
 
 export const patientSchema = z.object({
   name: z.string().trim().min(2, "Name is required").max(100),
@@ -40,7 +40,6 @@ export function validatePatient(v: PatientInput) {
 
 export function PatientForm({ value, onChange, errors = {} }: { value: PatientInput; onChange: (v: PatientInput) => void; errors?: Partial<Record<keyof PatientInput, string>> }) {
   const set = (k: keyof PatientInput) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => onChange({ ...value, [k]: e.target.value });
-  const { t } = useI18n();
   const b = bmi(Number(value.height_cm), Number(value.weight_kg));
   return (
     <div className="grid gap-4 md:grid-cols-6">
