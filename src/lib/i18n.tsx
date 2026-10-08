@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { DISCLAIMER } from "./clinic";
+import { EDUCATION_MR } from "./education";
 
 export type Lang = "en" | "mr";
 const KEY = "barakshar-lang";
@@ -276,7 +277,7 @@ const MR: Record<string, string> = {
 };
 
 export function translate(lang: Lang, s: string) {
-  return lang === "mr" ? (MR[s] ?? s) : s;
+  return lang === "mr" ? (EDUCATION_MR[s] ?? MR[s] ?? s) : s;
 }
 
 type Ctx = { lang: Lang; setLang: (l: Lang) => void; t: (s: string) => string };
