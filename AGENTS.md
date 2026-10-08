@@ -14,3 +14,5 @@
 - Visit symptoms/examination/prescription are stored as JSON columns on `visits`; shapes and defaults live in `src/lib/clinic.ts` (use `mergeExam`/`mergeRx` when reading).
 - PDFs are rendered client-side from HTML blocks via html2canvas into jsPDF (`src/lib/pdf.ts`) so Marathi script shapes correctly, uploaded to the private `case-documents` bucket under `{userId}/{visitId}/`, and each upload gets a new `visit_documents` row — never overwrite.
 - UI language (English/Marathi) lives in `src/lib/i18n.tsx`, keyed by the English text; stored values stay English and are translated only for display/PDF so data is language-neutral.
+- Public educational sections have separate leaf routes and a shared EducationShell; their scoped semantic theme does not alter protected clinical screens.
+- Educational copy and Marathi translations live in the browser-safe education module; external resources are clearly distinguished from clinic guides and treatment advice.

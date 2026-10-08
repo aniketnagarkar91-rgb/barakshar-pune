@@ -96,7 +96,7 @@
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
   }
-  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.015em; }
+  h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: 0; }
 }
 
 @utility font-display { font-family: var(--font-display); }
@@ -117,3 +117,37 @@
     linear-gradient(90deg, oklch(0.52 0.17 252 / 6%) 1px, transparent 1px);
   background-size: 28px 28px;
 }
+
+/* Public education uses its own semantic palette; clinical screens stay blue. */
+.education-site {
+  --background: oklch(0.989 0.004 140);
+  --foreground: oklch(0.29 0.045 160);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --primary: oklch(0.39 0.075 160);
+  --primary-foreground: oklch(0.99 0.003 140);
+  --primary-deep: oklch(0.29 0.065 160);
+  --primary-soft: oklch(0.95 0.018 145);
+  --secondary: oklch(0.95 0.012 140);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.96 0.009 140);
+  --muted-foreground: oklch(0.48 0.025 150);
+  --accent: oklch(0.91 0.04 80);
+  --accent-foreground: oklch(0.37 0.065 70);
+  --border: oklch(0.9 0.014 145);
+  --input: var(--border);
+  --ring: var(--primary);
+  --radius: 0.5rem;
+  background: var(--background);
+  color: var(--foreground);
+}
+.education-hero { position: relative; min-height: 560px; }
+.education-hero > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center; }
+.education-hero-copy { position: relative; z-index: 1; }
+.education-intro { animation: education-enter 600ms ease-out both; }
+@keyframes education-enter { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 767px) {
+  .education-hero { min-height: 590px; }
+  .education-hero > img { object-position: 62% center; opacity: 0.38; }
+}
+@media (prefers-reduced-motion: reduce) { .education-intro { animation: none; } }
